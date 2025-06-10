@@ -62,7 +62,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       // StreamBuilder listens for real-time updates from the user's todos collection.
       body: StreamBuilder<QuerySnapshot>(
-        stream: _todosCollection.orderBy('createdAt', descending: true).snapshots(), // Simplified initial query, sorting is done client-side for priority list
+        stream: _todosCollection.snapshots(), // Simplified initial query, sorting is done client-side for priority list
         builder: (context, snapshot) {
           // Show a loading indicator while data is being fetched.
           if (snapshot.connectionState == ConnectionState.waiting) {

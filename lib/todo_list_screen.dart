@@ -243,8 +243,7 @@ class _TodoListScreenState extends State<TodoListScreen> {
     return Scaffold(
       body: StreamBuilder<QuerySnapshot>(
         stream: _todosCollection
-            .orderBy('isImportant', descending: true)
-            .orderBy('createdAt', descending: true)
+           
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
