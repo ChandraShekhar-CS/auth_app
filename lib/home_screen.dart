@@ -1,84 +1,210 @@
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http; // For Quote of the day
-import 'dart:convert'; // For Quote of the day
-import 'package:auth_app/todo_list_screen.dart'; // Import the To-Do screen
-import 'package:auth_app/profile_screen.dart'; // Import the Profile screen
+// home_screen.dart
 
-// --- Quote of the Day Widget ---
-class QuoteCard extends StatefulWidget {
-  const QuoteCard({super.key});
+import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
+// NEW: Import the Todo model from your todo_list_screen.
+// Make sure the path is correct for your project structure.
+import 'todo_list_screen.dart'; 
+
+// MODIFIED: Converted from StatelessWidget to StatefulWidget to handle real-time data.
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
 
   @override
-  State<QuoteCard> createState() => _QuoteCardState();
+  State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _QuoteCardState extends State<QuoteCard> {
-  String _quote = 'Loading quote...';
-  String _author = '';
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchQuote();
-  }
-
-  // Fetches a random quote from an API.
-  Future<void> _fetchQuote() async {
-    try {
-      final response = await http.get(Uri.parse('https://api.quotable.io/random'));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (mounted) {
-          setState(() {
-            _quote = data['content'];
-            _author = data['author'];
-          });
-        }
-      } else {
-        throw Exception('Failed to load quote');
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _quote = 'Could not fetch quote. Please try again later.';
-          _author = '';
-        });
-      }
-    }
+class _HomeScreenState extends State<HomeScreen> {
+  final _currentUser = FirebaseAuth.instance.currentUser;
+  
+  // NEW: Getter for the todos collection to avoid repetition.
+  CollectionReference get _todosCollection {
+    if (_currentUser == null) throw Exception("User is not logged in.");
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(_currentUser!.uid)
+        .collection('todos');
   }
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 4,
-      margin: const EdgeInsets.all(16.0),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              _quote,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontStyle: FontStyle.italic,
+    return Scaffold(
+      // NEW: Using a StreamBuilder to listen for real-time updates from Firestore.
+      body: StreamBuilder<QuerySnapshot>(
+        stream: _todosCollection.snapshots(),
+        builder: (context, snapshot) {
+          // Show a loading indicator while data is being fetched.
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          // Handle potential errors.
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
+          // If there's no data, it might be an empty list or an issue.
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return _buildWelcomeMessage(); // Show only the welcome message.
+          }
+
+          // Convert the Firestore documents into a list of Todo objects.
+          final allTasks = snapshot.data!.docs
+              .map((doc) => Todo.fromFirestore(doc))
+              .toList();
+          
+          // --- NEW: Calculate Statistics ---
+          final pendingTasks = allTasks.where((task) => !task.isDone).length;
+          final importantTasks = allTasks.where((task) => task.isImportant && !task.isDone).length;
+          final dueTodayTasks = allTasks.where((task) {
+            if (task.dueDate == null || task.isDone) return false;
+            final now = DateTime.now();
+            final dueDate = task.dueDate!.toDate();
+            return now.year == dueDate.year && now.month == dueDate.month && now.day == dueDate.day;
+          }).length;
+          
+          // --- NEW: Filter for important tasks list ---
+          final importantTasksList = allTasks.where((task) => task.isImportant && !task.isDone).toList();
+
+
+          // The main layout for the dashboard.
+          return SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // --- Welcome Message ---
+                  Text(
+                    'Welcome,',
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                  Text(
+                    _currentUser?.displayName ?? _currentUser?.email ?? 'User',
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // --- NEW: Statistics Section ---
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _StatCard(
+                          icon: Icons.pending_actions_rounded,
+                          label: 'Pending',
+                          count: pendingTasks.toString(),
+                          color: Colors.orange.shade700,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _StatCard(
+                          icon: Icons.star_rounded,
+                          label: 'Important',
+                          count: importantTasks.toString(),
+                          color: Colors.amber.shade800,
+                        ),
+                      ),
+                       const SizedBox(width: 16),
+                       Expanded(
+                        child: _StatCard(
+                          icon: Icons.today_rounded,
+                          label: 'Due Today',
+                          count: dueTodayTasks.toString(),
+                          color: Colors.red.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 32),
+
+                  // --- NEW: Important Tasks List Section ---
+                  Text(
+                    'Your Important Tasks',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 8),
+
+                  importantTasksList.isEmpty 
+                    ? _buildEmptyImportantList() 
+                    : _buildImportantTasksList(importantTasksList),
+
+                ],
               ),
-              textAlign: TextAlign.center,
             ),
-            if (_author.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                '- $_author',
-                style: Theme.of(context).textTheme.titleSmall,
-                textAlign: TextAlign.right,
-              ),
-            ],
+          );
+        },
+      ),
+    );
+  }
+
+  // NEW: A simple welcome message for when there's no data.
+  Widget _buildWelcomeMessage() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            'Welcome,',
+            style: Theme.of(context).textTheme.headlineMedium,
+          ),
+          Text(
+            _currentUser?.displayName ?? _currentUser?.email ?? 'User',
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+          ),
+          const SizedBox(height: 16),
+          const Text('Your dashboard will appear here.'),
+        ],
+      ),
+    );
+  }
+  
+  // NEW: A widget for the list of important tasks.
+  Widget _buildImportantTasksList(List<Todo> tasks) {
+    return ListView.builder(
+      shrinkWrap: true, // Important to use inside a SingleChildScrollView
+      physics: const NeverScrollableScrollPhysics(), // Disables scrolling for the inner list
+      itemCount: tasks.length,
+      itemBuilder: (context, index) {
+        final task = tasks[index];
+        return Card(
+          elevation: 1,
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          child: ListTile(
+            title: Text(task.title),
+            subtitle: task.dueDate != null 
+              ? Text('Due: ${DateFormat.yMMMd().format(task.dueDate!.toDate())}')
+              : null,
+            leading: Icon(Icons.label_important, color: Colors.amber.shade700),
+          ),
+        );
+      },
+    );
+  }
+
+  // NEW: A placeholder widget for when the important tasks list is empty.
+  Widget _buildEmptyImportantList() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Center(
+        child: Column(
+          children: [
+            Icon(Icons.star_outline_rounded, size: 40, color: Colors.grey.shade600),
             const SizedBox(height: 8),
-            IconButton(
-              onPressed: _fetchQuote,
-              icon: const Icon(Icons.refresh),
-              tooltip: 'New Quote',
-            )
+            Text(
+              'No important tasks right now!',
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
+            ),
           ],
         ),
       ),
@@ -86,70 +212,44 @@ class _QuoteCardState extends State<QuoteCard> {
   }
 }
 
+// NEW: A reusable widget for the statistic cards.
+class _StatCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String count;
+  final Color color;
 
-// --- Home Screen ---
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+  const _StatCard({
+    required this.icon,
+    required this.label,
+    required this.count,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
-    // Get the current user from Firebase Auth.
-    final user = FirebaseAuth.instance.currentUser;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Home'),
-        actions: [
-          // Sign Out Button
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () {
-              FirebaseAuth.instance.signOut();
-            },
-            tooltip: 'Sign Out',
-          ),
-        ],
+    return Container(
+      padding: const EdgeInsets.all(16.0),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3))
       ),
-      body: Center(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Welcome message
-              Text(
-                'Welcome, ${user?.displayName ?? user?.email ?? 'User'}!',
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-              const SizedBox(height: 16),
-        
-              // Quote of the Day Widget
-              const QuoteCard(),
-        
-              // Button to To-Do List
-              ElevatedButton.icon(
-                icon: const Icon(Icons.list_alt),
-                label: const Text('My To-Do List'),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (ctx) => const TodoListScreen()),
-                  );
-                },
-              ),
-              const SizedBox(height: 16),
-        
-              // Button to Profile
-              ElevatedButton.icon(
-                icon: const Icon(Icons.person),
-                label: const Text('Go to Profile'),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (ctx) => const ProfileScreen()),
-                  );
-                },
-              ),
-            ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 28),
+          const SizedBox(height: 8),
+          Text(
+            count,
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
           ),
-        ),
+          Text(label, style: TextStyle(color: Colors.grey.shade700)),
+        ],
       ),
     );
   }

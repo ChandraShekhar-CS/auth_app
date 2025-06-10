@@ -1,7 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:auth_app/auth_screen.dart'; // We will create this next
-import 'package:auth_app/home_screen.dart'; // And this one too
+// And this one too
+import 'package:auth_app/main_scaffold.dart';
 
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
@@ -19,7 +20,7 @@ class AuthGate extends StatelessWidget {
           }
 
           // If the user is logged in, show the HomeScreen.
-          return const HomeScreen();
+          return const MainScaffold();
         },
       ),
     );
