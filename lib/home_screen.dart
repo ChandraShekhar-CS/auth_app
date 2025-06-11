@@ -16,7 +16,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMixin<HomeScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance; // Store FirebaseAuth instance
   User? _currentUser; // Store current user
 
@@ -25,6 +25,9 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _currentUser = _auth.currentUser; // Get current user in initState
   }
+
+  @override
+  bool get wantKeepAlive => true;
   
   // Getter for the todos collection for the current user.
   CollectionReference get _todosCollection {
@@ -42,6 +45,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Call super.build for AutomaticKeepAliveClientMixin
     if (_currentUser == null) {
       // If user becomes null (e.g. signed out in background), show a loading or error state.
       // This prevents errors if _todosCollection is accessed.

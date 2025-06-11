@@ -12,7 +12,7 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveClientMixin<ProfileScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _deleteConfirmController =
@@ -131,109 +131,106 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  // --- New Function to show change password dialog ---
-  void _showChangePasswordDialog() {
-    // This check is important before showing a dialog that needs the user
-    if (_currentUser == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('User not found. Please re-login.'), backgroundColor: Colors.red),
-      );
-      return;
-    }
-
-    final GlobalKey<FormState> passwordFormKey = GlobalKey<FormState>();
-    final TextEditingController currentPasswordController =
-        TextEditingController();
-    final TextEditingController newPasswordController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Change Password'),
-          content: Form(
-            key: passwordFormKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: currentPasswordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Current Password',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your current password.';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: newPasswordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'New Password',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.trim().length < 6) {
-                      return 'Password must be at least 6 characters long.';
-                    }
-                    return null;
-                  },
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                currentPasswordController.dispose();
-                newPasswordController.dispose();
-              },
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async { // Make this async
-                if (passwordFormKey.currentState?.validate() == true) {
-                  final String currentPasswordVal = currentPasswordController.text;
-                  final String newPasswordVal = newPasswordController.text;
-
-                  final NavigatorState dialogNavigator = Navigator.of(context); // context here is the dialog's context
-
-                  // Optional: Add a local loading state for the dialog button itself
-                  // For now, _changePassword handles its own _isLoading for the screen
-
-                  await _changePassword( // ****** CRITICAL: await this call ******
-                    currentPasswordVal,
-                    newPasswordVal,
-                  );
-
-                  if (!mounted) return;
-
-                  // Apply post-frame callback for popping
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted && dialogNavigator.canPop()) {
-                      dialogNavigator.pop();
-                    }
-                  });
-                  // Disposing controllers is already handled by .then() on showDialog
-                }
-              },
-              child: const Text('Update Password'),
-            )
-          ],
-        );
-      },
-    ).then((_) {
-      currentPasswordController.dispose();
-      newPasswordController.dispose();
-    });
+void _showChangePasswordDialog() {
+  if (_currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('User not found. Please re-login.'), backgroundColor: Colors.red),
+    );
+    return;
   }
+
+  final GlobalKey<FormState> passwordFormKey = GlobalKey<FormState>();
+  final TextEditingController currentPasswordController = TextEditingController();
+  final TextEditingController newPasswordController = TextEditingController();
+
+  showDialog(
+    context: context, // Screen's context
+    builder: (dialogOuterContext) { // Context for the dialog's frame
+      final NavigatorState capturedDialogNavigator = Navigator.of(dialogOuterContext);
+
+      return Builder( // New Builder widget
+        builder: (dialogInnerContext) { // Fresh context for AlertDialog
+          return AlertDialog(
+            title: const Text('Change Password'),
+            content: Form(
+              key: passwordFormKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: currentPasswordController,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Current Password',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter your current password.';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: newPasswordController,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'New Password',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().length < 6) {
+                        return 'Password must be at least 6 characters long.';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  if (capturedDialogNavigator.canPop()) {
+                    capturedDialogNavigator.pop();
+                  }
+                  // Controllers are disposed in .then() or .whenComplete()
+                },
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  if (passwordFormKey.currentState?.validate() == true) {
+                    final String currentPasswordVal = currentPasswordController.text;
+                    final String newPasswordVal = newPasswordController.text;
+
+                    await _changePassword(
+                      currentPasswordVal,
+                      newPasswordVal,
+                    );
+
+                    if (!mounted) return;
+
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted && capturedDialogNavigator.canPop()) {
+                        capturedDialogNavigator.pop();
+                      }
+                    });
+                  }
+                },
+                child: const Text('Update Password'),
+              )
+            ],
+          );
+        }
+      );
+    },
+  ).whenComplete(() { // This .whenComplete is on the showDialog Future
+    currentPasswordController.dispose();
+    newPasswordController.dispose();
+  });
+}
 
   // Handles the logic for changing the user's password.
   Future<void> _changePassword(
@@ -434,7 +431,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   @override
+  bool get wantKeepAlive => true;
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context); // Call super.build
     // If for some reason this screen is built without a user, show a message.
     if (_currentUser == null) {
       return const Center(
