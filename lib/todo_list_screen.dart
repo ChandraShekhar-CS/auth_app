@@ -54,66 +54,73 @@ class _TodoListScreenState extends State<TodoListScreen> with AutomaticKeepAlive
     await _todosCollection.doc(todoId).delete();
   }
 
-  void _showAddEditTodoDialog({Todo? todo}) {
-    final titleController = TextEditingController(text: todo?.title ?? '');
-    final isImportantNotifier = ValueNotifier<bool>(todo?.isImportant ?? false);
-    final dueDateNotifier = ValueNotifier<DateTime?>(todo?.dueDate?.toDate());
-    final isSavingNotifier = ValueNotifier<bool>(false);
+void _showAddEditTodoDialog({Todo? todo}) {
+  final titleController = TextEditingController(text: todo?.title ?? '');
+  final isImportantNotifier = ValueNotifier<bool>(todo?.isImportant ?? false);
+  final dueDateNotifier = ValueNotifier<DateTime?>(todo?.dueDate?.toDate());
+  final isSavingNotifier = ValueNotifier<bool>(false);
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        return ValueListenableBuilder<bool>(
-          valueListenable: isSavingNotifier,
-          builder: (context, isSaving, child) {
-            return AlertDialog(
-              title: Text(todo == null ? 'Add New Task' : 'Edit Task'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: titleController,
-                      autofocus: true,
-                      decoration: const InputDecoration(labelText: 'Task Title'),
-                      textCapitalization: TextCapitalization.sentences,
-                      readOnly: isSaving,
-                    ),
-                    ValueListenableBuilder<bool>(
-                      valueListenable: isImportantNotifier,
-                      builder: (context, isImportant, child) {
-                        return SwitchListTile(
-                          title: const Text('Important'),
-                          value: isImportant,
-                          onChanged: isSaving ? null : (value) => isImportantNotifier.value = value,
-                          secondary: Icon(Icons.star, color: isImportant ? Colors.amber : Colors.grey),
-                        );
-                      },
-                    ),
-                    ValueListenableBuilder<DateTime?>(
-                      valueListenable: dueDateNotifier,
-                      builder: (context, dueDate, child) {
-                        return ListTile(
-                          leading: const Icon(Icons.calendar_today),
-                          title: Text(dueDate == null ? 'No due date' : DateFormat.yMMMd().format(dueDate)),
-                          trailing: dueDate != null ? IconButton(icon: const Icon(Icons.clear), onPressed: isSaving ? null : () => dueDateNotifier.value = null) : null,
-                          onTap: isSaving ? null : () async {
-                            final pickedDate = await showDatePicker(
-                              context: context,
-                              initialDate: dueDate ?? DateTime.now(),
-                              firstDate: DateTime(2020),
-                              lastDate: DateTime(2101),
-                            );
-                            if (pickedDate != null) {
-                              dueDateNotifier.value = pickedDate;
-                            }
-                          },
-                        );
-                      },
-                    ),
-                  ],
+  showDialog(
+    context: context, // Screen's context
+    barrierDismissible: false,
+    builder: (dialogOuterContext) { // Context for the dialog's frame
+      // Capture NavigatorState from the outer context for the pop call
+      final NavigatorState capturedDialogNavigator = Navigator.of(dialogOuterContext);
+
+      return Builder( // New Builder widget
+        builder: (dialogInnerContext) { // Fresh context for dialog's content tree
+          return ValueListenableBuilder<bool>(
+            valueListenable: isSavingNotifier,
+            builder: (vcContext, isSaving, child) { // Use vcContext (from VLBuilder) for AlertDialog
+              return AlertDialog(
+                title: Text(todo == null ? 'Add New Task' : 'Edit Task'),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        controller: titleController,
+                        autofocus: true,
+                        decoration: const InputDecoration(labelText: 'Task Title'),
+                        textCapitalization: TextCapitalization.sentences,
+                        readOnly: isSaving,
+                      ),
+                      ValueListenableBuilder<bool>(
+                        valueListenable: isImportantNotifier,
+                        builder: (context, isImportant, child) { // This context is fine
+                          return SwitchListTile(
+                            title: const Text('Important'),
+                            value: isImportant,
+                            onChanged: isSaving ? null : (value) => isImportantNotifier.value = value,
+                            secondary: Icon(Icons.star, color: isImportant ? Colors.amber : Colors.grey),
+                          );
+                        },
+                      ),
+                      ValueListenableBuilder<DateTime?>(
+                        valueListenable: dueDateNotifier,
+                        builder: (context, dueDate, child) { // This context is fine
+                          return ListTile(
+                            leading: const Icon(Icons.calendar_today),
+                            title: Text(dueDate == null ? 'No due date' : DateFormat.yMMMd().format(dueDate)),
+                            trailing: dueDate != null ? IconButton(icon: const Icon(Icons.clear), onPressed: isSaving ? null : () => dueDateNotifier.value = null) : null,
+                            onTap: isSaving ? null : () async {
+                              final pickedDate = await showDatePicker(
+                                context: dialogInnerContext, // Use inner context for new routes from dialog
+                                initialDate: dueDate ?? DateTime.now(),
+                                firstDate: DateTime(2020),
+                                lastDate: DateTime(2101),
+                              );
+                              if (pickedDate != null) {
+                                dueDateNotifier.value = pickedDate;
+                              }
+                            },
+                          );
+                        },
+                      ),
+                    ],
+                  ),
                 ),
+<<<<<<< HEAD
               ),
               actions: [
                 TextButton(
@@ -148,13 +155,69 @@ class _TodoListScreenState extends State<TodoListScreen> with AutomaticKeepAlive
       isSavingNotifier.dispose();
     });
   }
+=======
+                actions: [
+                  TextButton(
+                    onPressed: isSaving ? null : () {
+                      if (capturedDialogNavigator.canPop()) {
+                        capturedDialogNavigator.pop();
+                      }
+                    },
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    onPressed: isSaving ? null : () async {
+                      isSavingNotifier.value = true;
+                      final String title = titleController.text.trim();
+                      final bool isImportant = isImportantNotifier.value;
+                      final DateTime? dueDate = dueDateNotifier.value;
+
+                      await _addOrUpdateTodo(
+                        todo: todo,
+                        title: title,
+                        isImportant: isImportant,
+                        dueDate: dueDate,
+                      );
+
+                      if (!mounted) return;
+
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (mounted && capturedDialogNavigator.canPop()) {
+                          capturedDialogNavigator.pop();
+                        }
+                      });
+                    },
+                    child: isSaving ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Save'),
+                  ),
+                ],
+              );
+            }
+          );
+        }
+      );
+    },
+  ).whenComplete(() {
+    titleController.dispose();
+    isImportantNotifier.dispose();
+    dueDateNotifier.dispose();
+    isSavingNotifier.dispose();
+  });
+}
+
+  @override
+  bool get wantKeepAlive => true;
+>>>>>>> 770337839f3016115ede58c4cbe2b7bfa043cff5
 
   @override
   bool get wantKeepAlive => true;
 
   @override
   Widget build(BuildContext context) {
+<<<<<<< HEAD
     super.build(context);
+=======
+    super.build(context); // Call super.build
+>>>>>>> 770337839f3016115ede58c4cbe2b7bfa043cff5
     return Scaffold(
       body: StreamBuilder<QuerySnapshot>(
         stream: _todosCollection.orderBy('createdAt', descending: true).snapshots(),

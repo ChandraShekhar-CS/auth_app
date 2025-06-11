@@ -12,8 +12,13 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMixin<HomeScreen> {
+<<<<<<< HEAD
   final FirebaseAuth _auth = FirebaseAuth.instance;
   User? _currentUser;
+=======
+  final FirebaseAuth _auth = FirebaseAuth.instance; // Store FirebaseAuth instance
+  User? _currentUser; // Store current user
+>>>>>>> 770337839f3016115ede58c4cbe2b7bfa043cff5
 
   @override
   void initState() {
@@ -36,7 +41,11 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
 
   @override
   Widget build(BuildContext context) {
+<<<<<<< HEAD
     super.build(context);
+=======
+    super.build(context); // Call super.build for AutomaticKeepAliveClientMixin
+>>>>>>> 770337839f3016115ede58c4cbe2b7bfa043cff5
     if (_currentUser == null) {
       return const Scaffold(
         body: Center(

@@ -86,6 +86,7 @@ class _NotesScreenState extends State<NotesScreen> with AutomaticKeepAliveClient
     }
   }
 
+<<<<<<< HEAD
   void _showAddEditNoteDialog({Note? note}) {
     final titleController = TextEditingController(text: note?.title ?? '');
     final contentController = TextEditingController(text: note?.content ?? '');
@@ -164,13 +165,121 @@ class _NotesScreenState extends State<NotesScreen> with AutomaticKeepAliveClient
       isSavingNotifier.dispose();
     });
   }
+=======
+void _showAddEditNoteDialog({Note? note}) {
+  final titleController = TextEditingController(text: note?.title ?? '');
+  final contentController = TextEditingController(text: note?.content ?? '');
+  final isSavingNotifier = ValueNotifier<bool>(false);
+
+  showDialog(
+    context: context, // Screen's context
+    barrierDismissible: false,
+    builder: (dialogOuterContext) { // Context for the dialog's frame
+      final NavigatorState capturedDialogNavigator = Navigator.of(dialogOuterContext);
+
+      return Builder( // New Builder widget
+        builder: (dialogInnerContext) { // Fresh context for dialog's content tree
+          return ValueListenableBuilder<bool>(
+            valueListenable: isSavingNotifier,
+            builder: (vcContext, isSaving, child) { // Use vcContext for AlertDialog
+              return AlertDialog(
+                title: Text(note == null ? 'Add New Note' : 'Edit Note'),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        controller: titleController,
+                        autofocus: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Title',
+                          hintText: 'Enter note title',
+                          border: OutlineInputBorder(),
+                        ),
+                        textCapitalization: TextCapitalization.sentences,
+                        readOnly: isSaving,
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: contentController,
+                        decoration: const InputDecoration(
+                          labelText: 'Content',
+                          hintText: 'Enter note content...',
+                          border: OutlineInputBorder(),
+                          alignLabelWithHint: true,
+                        ),
+                        maxLines: 8,
+                        textCapitalization: TextCapitalization.sentences,
+                        readOnly: isSaving,
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: isSaving ? null : () {
+                      if (capturedDialogNavigator.canPop()) {
+                        capturedDialogNavigator.pop();
+                      }
+                    },
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    onPressed: isSaving ? null : () async {
+                      isSavingNotifier.value = true;
+                      final title = titleController.text.trim();
+                      final content = contentController.text.trim();
+
+                      if (note == null) {
+                        await _addNote(title, content);
+                      } else {
+                        await _updateNote(note, title, content);
+                      }
+
+                      if (!mounted) return;
+
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (mounted && capturedDialogNavigator.canPop()) {
+                          capturedDialogNavigator.pop();
+                        }
+                      });
+                    },
+                    child: isSaving
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : Text(note == null ? 'Add Note' : 'Save Changes'),
+                  ),
+                ],
+              );
+            }
+          );
+        }
+      );
+    },
+  ).whenComplete(() {
+    titleController.dispose();
+    contentController.dispose();
+    isSavingNotifier.dispose();
+  });
+}
+
+  @override
+  bool get wantKeepAlive => true;
+>>>>>>> 770337839f3016115ede58c4cbe2b7bfa043cff5
 
   @override
   bool get wantKeepAlive => true;
 
   @override
   Widget build(BuildContext context) {
+<<<<<<< HEAD
     super.build(context);
+=======
+    super.build(context); // Call super.build
+>>>>>>> 770337839f3016115ede58c4cbe2b7bfa043cff5
     return Scaffold(
       body: StreamBuilder<QuerySnapshot>(
         stream: _notesCollection.orderBy('createdAt', descending: true).snapshots(),
