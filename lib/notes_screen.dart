@@ -197,11 +197,14 @@ class _NotesScreenState extends State<NotesScreen> {
                       await _updateNote(note, title, content);
                     }
 
-                    // *** IMPORTANT FIX ***
-                    // Check if the state is still mounted before interacting with the navigator.
                     if (!mounted) return;
 
-                    navigator.pop();
+                    // Apply post-frame callback for popping
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted && navigator.canPop()) {
+                        navigator.pop();
+                      }
+                    });
                   },
                   child: isSaving
                       ? const SizedBox(

@@ -213,11 +213,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     newPasswordVal,
                   );
 
-                  if (!mounted) return; // Refers to _ProfileScreenState.mounted
+                  if (!mounted) return;
 
-                  if (dialogNavigator.canPop()) {
-                    dialogNavigator.pop();
-                  }
+                  // Apply post-frame callback for popping
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted && dialogNavigator.canPop()) {
+                      dialogNavigator.pop();
+                    }
+                  });
                   // Disposing controllers is already handled by .then() on showDialog
                 }
               },

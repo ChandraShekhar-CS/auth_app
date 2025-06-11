@@ -170,9 +170,12 @@ class _TodoListScreenState extends State<TodoListScreen> {
 
                     if (!mounted) return;
 
-                    if (dialogNavigator.canPop()) {
+                    // Apply post-frame callback for popping
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted && dialogNavigator.canPop()) {
                         dialogNavigator.pop();
-                    }
+                      }
+                    });
                   },
                   child: isSaving ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Save'),
                 ),
