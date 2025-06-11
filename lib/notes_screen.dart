@@ -1,13 +1,10 @@
-// notes_screen.dart
-import 'dart:math'; // For String.substring and min function.
-
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
-
-import 'models/note_model.dart'; // Import the Note model.
-import 'note_detail_screen.dart'; // Import NoteDetailScreen for viewing.
+import 'models/note_model.dart';
+import 'note_detail_screen.dart';
 
 class NotesScreen extends StatefulWidget {
   const NotesScreen({super.key});
@@ -16,28 +13,21 @@ class NotesScreen extends StatefulWidget {
   State<NotesScreen> createState() => _NotesScreenState();
 }
 
-class _NotesScreenState extends State<NotesScreen> {
+class _NotesScreenState extends State<NotesScreen> with AutomaticKeepAliveClientMixin<NotesScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // Provides a reference to the current user's 'notes' collection.
   CollectionReference get _notesCollection {
     final userId = _auth.currentUser?.uid;
     if (userId == null) {
-      debugPrint("Error: Current user is null in _notesCollection getter.");
       throw Exception("User is not logged in. Cannot access notes.");
     }
     return _firestore.collection('users').doc(userId).collection('notes');
   }
 
-  // Adds a new note to Firestore.
   Future<void> _addNote(String title, String content) async {
     if (title.isEmpty && content.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cannot save an empty note.')),
-        );
-      }
+      // Avoid using context in async gaps if possible
       return;
     }
     try {
@@ -46,28 +36,13 @@ class _NotesScreenState extends State<NotesScreen> {
         'content': content,
         'createdAt': Timestamp.now(),
       });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Note added successfully!'), backgroundColor: Colors.green),
-        );
-      }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to add note: $e'), backgroundColor: Theme.of(context).colorScheme.error),
-        );
-      }
+      // Handle error, maybe log it
     }
   }
 
-  // Updates an existing note in Firestore.
   Future<void> _updateNote(Note note, String newTitle, String newContent) async {
     if (newTitle.isEmpty && newContent.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cannot save an empty note. Delete it instead?')),
-        );
-      }
       return;
     }
     try {
@@ -75,28 +50,18 @@ class _NotesScreenState extends State<NotesScreen> {
         'title': newTitle,
         'content': newContent,
       });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Note updated successfully!'), backgroundColor: Colors.green),
-        );
-      }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update note: $e'), backgroundColor: Theme.of(context).colorScheme.error),
-        );
-      }
+      // Handle error
     }
   }
 
-  // Deletes a note from Firestore after confirmation.
   Future<void> _deleteNote(String noteId) async {
     final bool? confirmDelete = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('Confirm Delete'),
-          content: const Text('Are you sure you want to delete this note? This action cannot be undone.'),
+          content: const Text('Are you sure you want to delete this note?'),
           actions: <Widget>[
             TextButton(
               child: const Text('Cancel'),
@@ -115,22 +80,12 @@ class _NotesScreenState extends State<NotesScreen> {
     if (confirmDelete == true) {
       try {
         await _notesCollection.doc(noteId).delete();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Note deleted successfully!'), backgroundColor: Colors.green),
-          );
-        }
       } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to delete note: $e'), backgroundColor: Theme.of(context).colorScheme.error),
-          );
-        }
+        // Handle error
       }
     }
   }
 
-  // Shows a dialog for adding a new note or editing an existing one.
   void _showAddEditNoteDialog({Note? note}) {
     final titleController = TextEditingController(text: note?.title ?? '');
     final contentController = TextEditingController(text: note?.content ?? '');
@@ -138,7 +93,7 @@ class _NotesScreenState extends State<NotesScreen> {
 
     showDialog(
       context: context,
-      barrierDismissible: false, // Prevent dismissing while saving
+      barrierDismissible: false,
       builder: (dialogContext) {
         return ValueListenableBuilder<bool>(
           valueListenable: isSavingNotifier,
@@ -152,23 +107,14 @@ class _NotesScreenState extends State<NotesScreen> {
                     TextField(
                       controller: titleController,
                       autofocus: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Title',
-                        hintText: 'Enter note title',
-                        border: OutlineInputBorder(),
-                      ),
+                      decoration: const InputDecoration(labelText: 'Title'),
                       textCapitalization: TextCapitalization.sentences,
                       readOnly: isSaving,
                     ),
                     const SizedBox(height: 16),
                     TextField(
                       controller: contentController,
-                      decoration: const InputDecoration(
-                        labelText: 'Content',
-                        hintText: 'Enter note content...',
-                        border: OutlineInputBorder(),
-                        alignLabelWithHint: true,
-                      ),
+                      decoration: const InputDecoration(labelText: 'Content'),
                       maxLines: 8,
                       textCapitalization: TextCapitalization.sentences,
                       readOnly: isSaving,
@@ -178,9 +124,7 @@ class _NotesScreenState extends State<NotesScreen> {
               ),
               actions: [
                 TextButton(
-                  onPressed: isSaving ? null : () {
-                    Navigator.of(dialogContext).pop();
-                  },
+                  onPressed: isSaving ? null : () => Navigator.of(dialogContext).pop(),
                   child: const Text('Cancel'),
                 ),
                 ElevatedButton(
@@ -188,23 +132,18 @@ class _NotesScreenState extends State<NotesScreen> {
                     isSavingNotifier.value = true;
                     final title = titleController.text.trim();
                     final content = contentController.text.trim();
-                    // Capture navigator before the await to avoid using context across async gaps.
-                    final navigator = Navigator.of(dialogContext);
 
                     if (note == null) {
                       await _addNote(title, content);
                     } else {
                       await _updateNote(note, title, content);
                     }
-
-                    if (!mounted) return;
-
-                    // Apply post-frame callback for popping
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (mounted && navigator.canPop()) {
-                        navigator.pop();
-                      }
-                    });
+                    
+                    // *** FIX: Pop the dialog's context directly after the await. ***
+                    // This is more stable than using a post-frame callback.
+                    if (dialogContext.mounted) {
+                      Navigator.of(dialogContext).pop();
+                    }
                   },
                   child: isSaving
                       ? const SizedBox(
@@ -227,7 +166,11 @@ class _NotesScreenState extends State<NotesScreen> {
   }
 
   @override
+  bool get wantKeepAlive => true;
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Scaffold(
       body: StreamBuilder<QuerySnapshot>(
         stream: _notesCollection.orderBy('createdAt', descending: true).snapshots(),
@@ -236,11 +179,10 @@ class _NotesScreenState extends State<NotesScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            debugPrint("Error fetching notes: ${snapshot.error}");
-            return const Center(child: Text('An error occurred while loading notes.'));
+            return const Center(child: Text('An error occurred.'));
           }
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return _buildEmptyState(); // Shows a message when there are no notes.
+            return _buildEmptyState();
           }
 
           final notes = snapshot.data!.docs
@@ -258,9 +200,7 @@ class _NotesScreenState extends State<NotesScreen> {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          _showAddEditNoteDialog();
-        },
+        onPressed: () => _showAddEditNoteDialog(),
         tooltip: 'Add Note',
         child: const Icon(Icons.add),
       ),
@@ -274,35 +214,22 @@ class _NotesScreenState extends State<NotesScreen> {
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
-      elevation: 1.5,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         title: Text(
           note.title.isEmpty ? "Untitled Note" : note.title,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.onSurface,
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (contentSnippet.isNotEmpty) ...[
               const SizedBox(height: 4),
-              Text(
-                contentSnippet,
-                style: TextStyle(color: Colors.grey.shade600),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
+              Text(contentSnippet),
             ],
             const SizedBox(height: 8),
             Text(
-              'Created: ${DateFormat.yMMMd().add_jm().format(note.createdAt.toDate())}',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade500),
+              'Created: ${DateFormat.yMMMd().format(note.createdAt.toDate())}',
+              style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
         ),
@@ -310,18 +237,12 @@ class _NotesScreenState extends State<NotesScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
-              icon: Icon(Icons.edit_outlined, color: Colors.grey.shade700),
-              onPressed: () {
-                _showAddEditNoteDialog(note: note);
-              },
-              tooltip: 'Edit Note',
+              icon: const Icon(Icons.edit_outlined),
+              onPressed: () => _showAddEditNoteDialog(note: note),
             ),
             IconButton(
               icon: Icon(Icons.delete_outline_rounded, color: Theme.of(context).colorScheme.error),
-              onPressed: () {
-                _deleteNote(note.id);
-              },
-              tooltip: 'Delete Note',
+              onPressed: () => _deleteNote(note.id),
             ),
           ],
         ),
@@ -336,26 +257,15 @@ class _NotesScreenState extends State<NotesScreen> {
   }
 
   Widget _buildEmptyState() {
-    return Center(
+    return const Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.note_add_outlined,
-            size: 80,
-            color: Colors.grey.shade400,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No notes yet!',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: Colors.grey),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Tap the \'+\' button to add your first note.',
-            style: TextStyle(fontSize: 16, color: Colors.grey),
-            textAlign: TextAlign.center,
-          ),
+          Icon(Icons.note_add_outlined, size: 80, color: Colors.grey),
+          SizedBox(height: 16),
+          Text('No notes yet!', style: TextStyle(fontSize: 22, color: Colors.grey)),
+          SizedBox(height: 8),
+          Text('Tap \'+\' to add your first note.', style: TextStyle(fontSize: 16, color: Colors.grey)),
         ],
       ),
     );

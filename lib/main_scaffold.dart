@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
-import 'home_screen.dart'; // Screen for the main dashboard.
-import 'profile_screen.dart'; // Screen for user profile settings.
-import 'todo_list_screen.dart'; // Screen for managing to-do tasks.
-import 'notes_screen.dart'; // Screen for managing notes.
+import 'home_screen.dart';
+import 'profile_screen.dart';
+import 'todo_list_screen.dart';
+import 'notes_screen.dart';
 
-/// MainScaffold is the primary UI structure after user authentication.
-/// It includes an AppBar and a BottomNavigationBar to switch between different screens.
 class MainScaffold extends StatefulWidget {
   const MainScaffold({super.key});
 
@@ -16,6 +14,20 @@ class MainScaffold extends StatefulWidget {
 class _MainScaffoldState extends State<MainScaffold> {
   int _selectedIndex = 0;
   late PageController _pageController;
+
+  final List<Widget> _pages = [
+    const HomeScreen(),
+    const TodoListScreen(),
+    const NotesScreen(),
+    const ProfileScreen(),
+  ];
+
+  static const List<String> _titles = <String>[
+    'Dashboard',
+    'My To-Do List',
+    'My Notes',
+    'Profile & Settings',
+  ];
 
   @override
   void initState() {
@@ -29,7 +41,6 @@ class _MainScaffoldState extends State<MainScaffold> {
     super.dispose();
   }
 
-  // This function is called when a navigation bar item is tapped.
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
@@ -37,24 +48,8 @@ class _MainScaffoldState extends State<MainScaffold> {
     _pageController.jumpToPage(index);
   }
 
-  // The list of titles for the AppBar.
-  static const List<String> _titles = <String>[
-    'Dashboard',
-    'My To-Do List',
-    'My Notes',
-    'Profile & Settings',
-  ];
-
   @override
   Widget build(BuildContext context) {
-    // Build pages on demand to avoid context issues
-    final List<Widget> pages = [
-      HomeScreen(),
-      TodoListScreen(),
-      NotesScreen(),
-      ProfileScreen(),
-    ];
-
     return Scaffold(
       appBar: AppBar(
         title: Text(_titles[_selectedIndex]),
@@ -63,11 +58,9 @@ class _MainScaffoldState extends State<MainScaffold> {
       body: PageView(
         controller: _pageController,
         physics: const NeverScrollableScrollPhysics(),
-        children: pages,
+        children: _pages,
       ),
       bottomNavigationBar: BottomNavigationBar(
-        // Ensure the type is fixed to prevent the bottom bar from changing behavior
-        // when more or fewer items are selected. This can also help with stability.
         type: BottomNavigationBarType.fixed,
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(

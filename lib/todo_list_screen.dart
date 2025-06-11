@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
-
-import 'models/todo_model.dart'; // Import the Todo model
+import 'models/todo_model.dart';
 
 class TodoListScreen extends StatefulWidget {
   const TodoListScreen({super.key});
@@ -12,7 +11,7 @@ class TodoListScreen extends StatefulWidget {
   State<TodoListScreen> createState() => _TodoListScreenState();
 }
 
-class _TodoListScreenState extends State<TodoListScreen> {
+class _TodoListScreenState extends State<TodoListScreen> with AutomaticKeepAliveClientMixin<TodoListScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
@@ -29,14 +28,10 @@ class _TodoListScreenState extends State<TodoListScreen> {
     required String title,
     required bool isImportant,
     DateTime? dueDate,
-  }) {
+  }) async {
     if (title.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Title cannot be empty.')),
-      );
-      return Future.value();
+      return;
     }
-
     final data = {
       'title': title,
       'isImportant': isImportant,
@@ -44,45 +39,19 @@ class _TodoListScreenState extends State<TodoListScreen> {
       'createdAt': todo?.createdAt ?? Timestamp.now(),
       'isDone': todo?.isDone ?? false,
     };
-
     if (todo == null) {
-      // Add new todo
-      return _todosCollection.add(data);
+      await _todosCollection.add(data);
     } else {
-      // Update existing todo
-      return _todosCollection.doc(todo.id).update(data);
+      await _todosCollection.doc(todo.id).update(data);
     }
   }
 
   Future<void> _toggleDoneStatus(Todo todo) async {
-    try {
-      await _todosCollection.doc(todo.id).update({'isDone': !todo.isDone});
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('Failed to update task status: $e'),
-              backgroundColor: Theme.of(context).colorScheme.error),
-        );
-      }
-    }
+    await _todosCollection.doc(todo.id).update({'isDone': !todo.isDone});
   }
 
   Future<void> _deleteTodo(String todoId) async {
-     try {
-        await _todosCollection.doc(todoId).delete();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Task deleted successfully!'), backgroundColor: Colors.green),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to delete task: $e'), backgroundColor: Theme.of(context).colorScheme.error),
-          );
-        }
-      }
+    await _todosCollection.doc(todoId).delete();
   }
 
   void _showAddEditTodoDialog({Todo? todo}) {
@@ -154,28 +123,16 @@ class _TodoListScreenState extends State<TodoListScreen> {
                 ElevatedButton(
                   onPressed: isSaving ? null : () async {
                     isSavingNotifier.value = true;
-                    final String title = titleController.text.trim();
-                    final bool isImportant = isImportantNotifier.value;
-                    final DateTime? dueDate = dueDateNotifier.value;
-
-                    // Capture the Navigator instance using dialogContext BEFORE the await
-                    final NavigatorState dialogNavigator = Navigator.of(dialogContext);
-
                     await _addOrUpdateTodo(
                       todo: todo,
-                      title: title,
-                      isImportant: isImportant,
-                      dueDate: dueDate,
+                      title: titleController.text.trim(),
+                      isImportant: isImportantNotifier.value,
+                      dueDate: dueDateNotifier.value,
                     );
-
-                    if (!mounted) return;
-
-                    // Apply post-frame callback for popping
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (mounted && dialogNavigator.canPop()) {
-                        dialogNavigator.pop();
-                      }
-                    });
+                    
+                    if(dialogContext.mounted) {
+                        Navigator.of(dialogContext).pop();
+                    }
                   },
                   child: isSaving ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Save'),
                 ),
@@ -193,7 +150,11 @@ class _TodoListScreenState extends State<TodoListScreen> {
   }
 
   @override
+  bool get wantKeepAlive => true;
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Scaffold(
       body: StreamBuilder<QuerySnapshot>(
         stream: _todosCollection.orderBy('createdAt', descending: true).snapshots(),
@@ -205,15 +166,15 @@ class _TodoListScreenState extends State<TodoListScreen> {
             return const Center(child: Text('Error loading tasks.'));
           }
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return Center(
+            return const Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.check_box_outline_blank, size: 80, color: Colors.grey.shade400),
-                  const SizedBox(height: 16),
-                  const Text('No tasks yet!', style: TextStyle(fontSize: 22, color: Colors.grey)),
-                   const SizedBox(height: 8),
-                  const Text('Tap \'+\' to add a new task.', style: TextStyle(fontSize: 16, color: Colors.grey)),
+                  Icon(Icons.check_box_outline_blank, size: 80, color: Colors.grey),
+                  SizedBox(height: 16),
+                  Text('No tasks yet!', style: TextStyle(fontSize: 22, color: Colors.grey)),
+                  SizedBox(height: 8),
+                  Text('Tap \'+\' to add a new task.', style: TextStyle(fontSize: 16, color: Colors.grey)),
                 ],
               ),
             );

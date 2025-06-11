@@ -12,11 +12,10 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveClientMixin<ProfileScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController _usernameController = TextEditingController();
-  final TextEditingController _deleteConfirmController =
-      TextEditingController();
+  final TextEditingController _deleteConfirmController = TextEditingController();
   final User? _currentUser = FirebaseAuth.instance.currentUser;
   bool _isLoading = false;
   File? _pickedImageFile;
@@ -32,7 +31,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  // --- Image Picking and Uploading ---
   Future<void> _pickImage() async {
     final pickedImage = await ImagePicker().pickImage(
       source: ImageSource.gallery,
@@ -40,9 +38,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       maxWidth: 150,
     );
 
-    if (pickedImage == null) {
-      return;
-    }
+    if (pickedImage == null) return;
 
     setState(() {
       _pickedImageFile = File(pickedImage.path);
@@ -52,11 +48,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _uploadImage() async {
-    // Create a local variable to ensure the user object is not null in this scope.
     final user = _currentUser;
-    if (_pickedImageFile == null || user == null) {
-      return;
-    }
+    if (_pickedImageFile == null || user == null) return;
 
     setState(() => _isUploading = true);
     try {
@@ -74,35 +67,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
           .doc(user.uid)
           .set({'photoUrl': imageUrl}, SetOptions(merge: true));
 
-      setState(() {
-        _photoUrl = imageUrl;
-      });
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Profile picture updated!'),
-            backgroundColor: Colors.green),
-      );
+      if(mounted) {
+        setState(() {
+            _photoUrl = imageUrl;
+        });
+      }
     } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text('Failed to upload image: $error'),
-            backgroundColor: Colors.red),
-      );
+      // Handle error
     } finally {
       if (mounted) setState(() => _isUploading = false);
     }
   }
 
-  // --- User Data Management ---
   Future<void> _updateUsername() async {
     final isValid = _formKey.currentState?.validate() ?? false;
-    // Create a local variable for null safety
     final user = _currentUser;
-    if (!isValid || user == null) {
-      return;
-    }
+    if (!isValid || user == null) return;
 
     setState(() => _isLoading = true);
     try {
@@ -112,43 +92,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
           .doc(user.uid)
           .set({'displayName': _usernameController.text.trim()},
               SetOptions(merge: true));
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Username updated successfully!'),
-            backgroundColor: Colors.green),
-      );
     } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text('Failed to update username: $error'),
-            backgroundColor: Colors.red),
-      );
+      // Handle error
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
-
-  // --- New Function to show change password dialog ---
+  
   void _showChangePasswordDialog() {
-    // This check is important before showing a dialog that needs the user
-    if (_currentUser == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('User not found. Please re-login.'), backgroundColor: Colors.red),
-      );
-      return;
-    }
+    if (_currentUser == null) return;
 
     final GlobalKey<FormState> passwordFormKey = GlobalKey<FormState>();
-    final TextEditingController currentPasswordController =
-        TextEditingController();
+    final TextEditingController currentPasswordController = TextEditingController();
     final TextEditingController newPasswordController = TextEditingController();
 
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return AlertDialog(
           title: const Text('Change Password'),
           content: Form(
@@ -159,10 +119,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 TextFormField(
                   controller: currentPasswordController,
                   obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Current Password',
-                    border: OutlineInputBorder(),
-                  ),
+                  decoration: const InputDecoration(labelText: 'Current Password'),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please enter your current password.';
@@ -174,10 +131,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 TextFormField(
                   controller: newPasswordController,
                   obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'New Password',
-                    border: OutlineInputBorder(),
-                  ),
+                  decoration: const InputDecoration(labelText: 'New Password'),
                   validator: (value) {
                     if (value == null || value.trim().length < 6) {
                       return 'Password must be at least 6 characters long.';
@@ -190,38 +144,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                currentPasswordController.dispose();
-                newPasswordController.dispose();
-              },
+              onPressed: () => Navigator.of(dialogContext).pop(),
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-              onPressed: () async { // Make this async
+              onPressed: () async {
                 if (passwordFormKey.currentState?.validate() == true) {
-                  final String currentPasswordVal = currentPasswordController.text;
-                  final String newPasswordVal = newPasswordController.text;
-
-                  final NavigatorState dialogNavigator = Navigator.of(context); // context here is the dialog's context
-
-                  // Optional: Add a local loading state for the dialog button itself
-                  // For now, _changePassword handles its own _isLoading for the screen
-
-                  await _changePassword( // ****** CRITICAL: await this call ******
-                    currentPasswordVal,
-                    newPasswordVal,
+                  await _changePassword(
+                    currentPasswordController.text,
+                    newPasswordController.text,
                   );
-
-                  if (!mounted) return;
-
-                  // Apply post-frame callback for popping
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted && dialogNavigator.canPop()) {
-                      dialogNavigator.pop();
-                    }
-                  });
-                  // Disposing controllers is already handled by .then() on showDialog
+                  if(dialogContext.mounted) {
+                    Navigator.of(dialogContext).pop();
+                  }
                 }
               },
               child: const Text('Update Password'),
@@ -229,196 +164,86 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
         );
       },
-    ).then((_) {
+    ).whenComplete(() {
       currentPasswordController.dispose();
       newPasswordController.dispose();
     });
   }
 
-  // Handles the logic for changing the user's password.
-  Future<void> _changePassword(
-      String currentPassword, String newPassword) async {
+  Future<void> _changePassword(String currentPassword, String newPassword) async {
     final user = _currentUser;
-    if (user == null || user.email == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('User not found. Please re-login.'),
-            backgroundColor: Colors.red));
-      }
-      return;
-    }
+    if (user == null || user.email == null) return;
 
     setState(() => _isLoading = true);
     try {
       final cred = EmailAuthProvider.credential(
           email: user.email!, password: currentPassword);
       await user.reauthenticateWithCredential(cred);
-
       await user.updatePassword(newPassword);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Password updated successfully!'),
-              backgroundColor: Colors.green),
-        );
-      }
-    } on FirebaseAuthException catch (error) {
-      if (mounted) {
-        String errorMessage = 'An error occurred during password change.';
-        if (error.code == 'wrong-password') {
-          errorMessage = 'The current password you entered is incorrect.';
-        } else if (error.code == 'weak-password') {
-          errorMessage = 'The new password is too weak.';
-        } else {
-          errorMessage = error.message ?? errorMessage;
-        }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(errorMessage),
-              backgroundColor: Theme.of(context).colorScheme.error),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('An unexpected error occurred: $e'),
-              backgroundColor: Theme.of(context).colorScheme.error),
-        );
-      }
+    } catch (error) {
+      // handle error
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // Signs out the current user.
   Future<void> _signOut() async {
     await FirebaseAuth.instance.signOut();
   }
 
-  // --- Delete Account Functionality ---
   void _showDeleteAccountConfirmationDialog() {
-     if (_currentUser == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('User not found. Please re-login.'), backgroundColor: Colors.red));
-      return;
-    }
+     if (_currentUser == null) return;
     _deleteConfirmController.clear();
-    final ValueNotifier<bool> confirmButtonEnabledNotifier =
-        ValueNotifier<bool>(false);
-
-    void updateConfirmButtonState() {
-      confirmButtonEnabledNotifier.value =
-          _deleteConfirmController.text == "DELETE";
-    }
-
-    _deleteConfirmController.addListener(updateConfirmButtonState);
-
     showDialog(
       context: context,
-      barrierDismissible: false,
       builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text('Delete Account Permanently?'),
-              content: SingleChildScrollView(
-                child: ListBody(
-                  children: <Widget>[
-                    const Text(
-                        'This action is irreversible. All your data (tasks, notes, etc.) associated with this account will be removed.'),
-                    const SizedBox(height: 16),
-                    const Text(
-                        'To confirm, please type "DELETE" (all uppercase) in the box below:'),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _deleteConfirmController,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        hintText: 'DELETE',
-                      ),
-                    ),
-                  ],
+        return AlertDialog(
+          title: const Text('Delete Account Permanently?'),
+          content: SingleChildScrollView(
+            child: ListBody(
+              children: <Widget>[
+                const Text('This action is irreversible.'),
+                const SizedBox(height: 16),
+                const Text('Type "DELETE" to confirm:'),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _deleteConfirmController,
+                  decoration: const InputDecoration(hintText: 'DELETE'),
                 ),
-              ),
-              actions: <Widget>[
-                TextButton(
-                    child: const Text('Cancel'),
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    }),
-                ValueListenableBuilder<bool>(
-                    valueListenable: confirmButtonEnabledNotifier,
-                    builder: (context, isEnabled, child) {
-                      return ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: isEnabled
-                              ? Theme.of(context).colorScheme.error
-                              : Colors.grey.shade400,
-                        ),
-                        onPressed: isEnabled
-                            ? () {
-                                Navigator.of(context).pop();
-                                _deleteAccount();
-                              }
-                            : null,
-                        child: const Text('Confirm Delete',
-                            style: TextStyle(color: Colors.white)),
-                      );
-                    }),
               ],
-            );
-          },
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error,
+              ),
+              onPressed: () {
+                if (_deleteConfirmController.text == "DELETE") {
+                    Navigator.of(context).pop();
+                    _deleteAccount();
+                }
+              },
+              child: const Text('Confirm Delete', style: TextStyle(color: Colors.white)),
+            ),
+          ],
         );
       },
-    ).whenComplete(() {
-      _deleteConfirmController.removeListener(updateConfirmButtonState);
-      confirmButtonEnabledNotifier.dispose();
-    });
+    );
   }
 
   Future<void> _deleteAccount() async {
     final user = _currentUser;
-    if (user == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('User not found. Please re-login.'),
-            backgroundColor: Colors.red));
-      }
-      return;
-    }
-
-    if (!mounted) return;
+    if (user == null) return;
     setState(() => _isLoading = true);
-
     try {
       await user.delete();
-    } on FirebaseAuthException catch (e) {
-      if (mounted) {
-        String errorMessage = 'Failed to delete account. Please try again.';
-        if (e.code == 'requires-recent-login') {
-          errorMessage =
-              'This operation is sensitive and requires recent authentication. Please sign out, sign back in, and then try to delete your account again.';
-        } else {
-          errorMessage = e.message ?? errorMessage;
-        }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(errorMessage),
-              backgroundColor: Theme.of(context).colorScheme.error,
-              duration: const Duration(seconds: 6)),
-        );
-      }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(
-                  'An unexpected error occurred while deleting your account: $e'),
-              backgroundColor: Theme.of(context).colorScheme.error,
-              duration: const Duration(seconds: 6)),
-        );
-      }
+      // handle error
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -434,12 +259,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   @override
+  bool get wantKeepAlive => true;
+
+  @override
   Widget build(BuildContext context) {
-    // If for some reason this screen is built without a user, show a message.
+    super.build(context);
     if (_currentUser == null) {
-      return const Center(
-        child: Text("No user logged in. Please restart the app."),
-      );
+      return const Center(child: Text("No user logged in."));
     }
     
     return ListView(
@@ -468,10 +294,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ? const SizedBox(
                             width: 20,
                             height: 20,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white))
-                        : const Icon(Icons.camera_alt,
-                            color: Colors.white, size: 20),
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Icon(Icons.camera_alt, color: Colors.white, size: 20),
                     onPressed: _pickImage,
                   ),
                 ),
@@ -481,19 +305,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         const SizedBox(height: 16),
         Center(
-          child: Text(
-            _currentUser?.email ?? 'user@example.com',
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(color: Colors.grey.shade600),
-          ),
+          child: Text(_currentUser?.email ?? 'user@example.com'),
         ),
         const SizedBox(height: 32),
         Card(
-          elevation: 4,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Form(
@@ -501,18 +316,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    'Edit Profile',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
+                  Text('Edit Profile', style: Theme.of(context).textTheme.titleLarge),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _usernameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Username / Display Name',
-                      prefixIcon: Icon(Icons.person_outline),
-                      border: OutlineInputBorder(),
-                    ),
+                    decoration: const InputDecoration(labelText: 'Username'),
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
                         return 'Username cannot be empty.';
@@ -535,36 +343,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         const SizedBox(height: 24),
         Card(
-          elevation: 4,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           child: Column(
             children: [
               ListTile(
                 leading: const Icon(Icons.lock_reset_rounded),
                 title: const Text('Change Password'),
-                subtitle: const Text('Update your password'),
                 onTap: _showChangePasswordDialog,
-                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
               ),
-              const Divider(height: 1, indent: 16, endIndent: 16),
+              const Divider(height: 1),
               ListTile(
-                leading:
-                    Icon(Icons.delete_forever, color: Colors.red.shade700),
-                title: Text('Delete Account',
-                    style: TextStyle(color: Colors.red.shade700)),
-                subtitle:
-                    const Text('Permanently remove your account and data'),
+                leading: Icon(Icons.delete_forever, color: Colors.red.shade700),
+                title: Text('Delete Account', style: TextStyle(color: Colors.red.shade700)),
                 onTap: _showDeleteAccountConfirmationDialog,
-                trailing: Icon(Icons.arrow_forward_ios,
-                    size: 16, color: Colors.red.shade700),
               ),
-              const Divider(height: 1, indent: 16, endIndent: 16),
+              const Divider(height: 1),
               ListTile(
-                leading:
-                    Icon(Icons.logout, color: Colors.blue.shade700),
-                title: Text('Sign Out',
-                    style: TextStyle(color: Colors.blue.shade700)),
+                leading: Icon(Icons.logout, color: Colors.blue.shade700),
+                title: Text('Sign Out', style: TextStyle(color: Colors.blue.shade700)),
                 onTap: _signOut,
               ),
             ],
