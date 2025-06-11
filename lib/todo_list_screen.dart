@@ -154,17 +154,25 @@ class _TodoListScreenState extends State<TodoListScreen> {
                 ElevatedButton(
                   onPressed: isSaving ? null : () async {
                     isSavingNotifier.value = true;
-                    final navigator = Navigator.of(dialogContext);
-                    
+                    final String title = titleController.text.trim();
+                    final bool isImportant = isImportantNotifier.value;
+                    final DateTime? dueDate = dueDateNotifier.value;
+
+                    // Capture the Navigator instance using dialogContext BEFORE the await
+                    final NavigatorState dialogNavigator = Navigator.of(dialogContext);
+
                     await _addOrUpdateTodo(
                       todo: todo,
-                      title: titleController.text.trim(),
-                      isImportant: isImportantNotifier.value,
-                      dueDate: dueDateNotifier.value,
+                      title: title,
+                      isImportant: isImportant,
+                      dueDate: dueDate,
                     );
 
                     if (!mounted) return;
-                    navigator.pop();
+
+                    if (dialogNavigator.canPop()) {
+                        dialogNavigator.pop();
+                    }
                   },
                   child: isSaving ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Save'),
                 ),

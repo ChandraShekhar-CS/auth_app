@@ -198,13 +198,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async { // Make this async
                 if (passwordFormKey.currentState?.validate() == true) {
-                  _changePassword(
-                    currentPasswordController.text,
-                    newPasswordController.text,
+                  final String currentPasswordVal = currentPasswordController.text;
+                  final String newPasswordVal = newPasswordController.text;
+
+                  final NavigatorState dialogNavigator = Navigator.of(context); // context here is the dialog's context
+
+                  // Optional: Add a local loading state for the dialog button itself
+                  // For now, _changePassword handles its own _isLoading for the screen
+
+                  await _changePassword( // ****** CRITICAL: await this call ******
+                    currentPasswordVal,
+                    newPasswordVal,
                   );
-                  Navigator.of(context).pop();
+
+                  if (!mounted) return; // Refers to _ProfileScreenState.mounted
+
+                  if (dialogNavigator.canPop()) {
+                    dialogNavigator.pop();
+                  }
+                  // Disposing controllers is already handled by .then() on showDialog
                 }
               },
               child: const Text('Update Password'),
