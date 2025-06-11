@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart'; // For date formatting
-// Import the Todo model from todo_list_screen.dart.
-// Ensure the path is correct for your project structure.
-import 'todo_list_screen.dart'; // Contains the Todo model
+
+// *** IMPORTANT FIX: Import the new todo_model.dart file directly ***
+import 'models/todo_model.dart'; // Contains the Todo model
 
 // HomeScreen is a StatefulWidget to handle real-time data from Firestore.
 class HomeScreen extends StatefulWidget {
@@ -87,7 +87,6 @@ class _HomeScreenState extends State<HomeScreen> {
           // --- Calculate Statistics ---
           final pendingTasks = allTasks.where((task) => !task.isDone).length;
           final completedTasks = allTasks.where((task) => task.isDone).length;
-          // final importantTasksCount = allTasks.where((task) => task.isImportant && !task.isDone).length; // Removed as it's not displayed directly
           final dueTodayTasks = allTasks.where((task) {
             if (task.dueDate == null || task.isDone) return false;
             final now = DateTime.now();
@@ -149,8 +148,6 @@ class _HomeScreenState extends State<HomeScreen> {
   // Builds the main content of the dashboard.
   Widget _buildDashboardContent(BuildContext context, List<Todo> priorityTasks, int pendingTasks, int completedTasks, int dueTodayTasks) {
     // If there are no tasks at all, show a generic welcome message.
-    // This condition can be refined based on whether `allTasks` (from StreamBuilder) is empty.
-    // For simplicity, if priorityTasks is empty and stats are zero, assume no tasks.
     if (priorityTasks.isEmpty && pendingTasks == 0 && completedTasks == 0 && dueTodayTasks == 0) {
         return _buildWelcomeMessage();
     }

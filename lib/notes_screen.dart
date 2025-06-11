@@ -24,7 +24,6 @@ class _NotesScreenState extends State<NotesScreen> {
   CollectionReference get _notesCollection {
     final userId = _auth.currentUser?.uid;
     if (userId == null) {
-      // This should ideally not happen if AuthGate is working correctly.
       debugPrint("Error: Current user is null in _notesCollection getter.");
       throw Exception("User is not logged in. Cannot access notes.");
     }
@@ -45,7 +44,7 @@ class _NotesScreenState extends State<NotesScreen> {
       await _notesCollection.add({
         'title': title,
         'content': content,
-        'createdAt': Timestamp.now(), // Sets creation timestamp on the server.
+        'createdAt': Timestamp.now(),
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -75,7 +74,6 @@ class _NotesScreenState extends State<NotesScreen> {
       await _notesCollection.doc(note.id).update({
         'title': newTitle,
         'content': newContent,
-        // 'createdAt' is not updated on edit, preserving the original creation date.
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -136,75 +134,92 @@ class _NotesScreenState extends State<NotesScreen> {
   void _showAddEditNoteDialog({Note? note}) {
     final titleController = TextEditingController(text: note?.title ?? '');
     final contentController = TextEditingController(text: note?.content ?? '');
+    final isSavingNotifier = ValueNotifier<bool>(false);
 
     showDialog(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text(note == null ? 'Add New Note' : 'Edit Note'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: titleController,
-                  autofocus: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Title',
-                    hintText: 'Enter note title',
-                    border: OutlineInputBorder(),
-                  ),
-                  textCapitalization: TextCapitalization.sentences,
+      barrierDismissible: false, // Prevent dismissing while saving
+      builder: (dialogContext) {
+        return ValueListenableBuilder<bool>(
+          valueListenable: isSavingNotifier,
+          builder: (context, isSaving, child) {
+            return AlertDialog(
+              title: Text(note == null ? 'Add New Note' : 'Edit Note'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: titleController,
+                      autofocus: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Title',
+                        hintText: 'Enter note title',
+                        border: OutlineInputBorder(),
+                      ),
+                      textCapitalization: TextCapitalization.sentences,
+                      readOnly: isSaving,
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: contentController,
+                      decoration: const InputDecoration(
+                        labelText: 'Content',
+                        hintText: 'Enter note content...',
+                        border: OutlineInputBorder(),
+                        alignLabelWithHint: true,
+                      ),
+                      maxLines: 8,
+                      textCapitalization: TextCapitalization.sentences,
+                      readOnly: isSaving,
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: contentController,
-                  decoration: const InputDecoration(
-                    labelText: 'Content',
-                    hintText: 'Enter note content...',
-                    border: OutlineInputBorder(),
-                    alignLabelWithHint: true,
-                  ),
-                  maxLines: 8,
-                  textCapitalization: TextCapitalization.sentences,
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSaving ? null : () {
+                    Navigator.of(dialogContext).pop();
+                  },
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: isSaving ? null : () async {
+                    isSavingNotifier.value = true;
+                    final title = titleController.text.trim();
+                    final content = contentController.text.trim();
+                    // Capture navigator before the await to avoid using context across async gaps.
+                    final navigator = Navigator.of(dialogContext);
+
+                    if (note == null) {
+                      await _addNote(title, content);
+                    } else {
+                      await _updateNote(note, title, content);
+                    }
+
+                    // *** IMPORTANT FIX ***
+                    // Check if the state is still mounted before interacting with the navigator.
+                    if (!mounted) return;
+
+                    navigator.pop();
+                  },
+                  child: isSaving
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : Text(note == null ? 'Add Note' : 'Save Changes'),
                 ),
               ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              child: const Text('Cancel'),
-              onPressed: () {
-                Navigator.of(context).pop();
-                titleController.dispose(); // Dispose controller on cancel
-                contentController.dispose();
-              },
-            ),
-            ElevatedButton(
-              child: Text(note == null ? 'Add Note' : 'Save Changes'),
-              onPressed: () {
-                final title = titleController.text.trim();
-                final content = contentController.text.trim();
-                if (note == null) {
-                  _addNote(title, content);
-                } else {
-                  _updateNote(note, title, content);
-                }
-                Navigator.of(context).pop();
-                titleController.dispose(); // Dispose controller on action
-                contentController.dispose();
-              },
-            ),
-          ],
+            );
+          },
         );
       },
-    ).then((_) {
-      // Fallback disposal if dialog is dismissed by other means (e.g., tapping outside)
-      // This is less ideal than explicit disposal in actions but provides some safety.
-      // However, if controllers are always disposed in actions, this might be redundant
-      // or even cause errors if already disposed. Given explicit disposal, this can be removed.
-      // titleController.dispose();
-      // contentController.dispose();
+    ).whenComplete(() {
+      titleController.dispose();
+      contentController.dispose();
+      isSavingNotifier.dispose();
     });
   }
 
@@ -212,7 +227,7 @@ class _NotesScreenState extends State<NotesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: StreamBuilder<QuerySnapshot>(
-        stream: _notesCollection.snapshots(),
+        stream: _notesCollection.orderBy('createdAt', descending: true).snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -225,7 +240,6 @@ class _NotesScreenState extends State<NotesScreen> {
             return _buildEmptyState(); // Shows a message when there are no notes.
           }
 
-          // Maps Firestore documents to Note objects.
           final notes = snapshot.data!.docs
               .map((doc) => Note.fromFirestore(doc))
               .toList();
@@ -235,7 +249,7 @@ class _NotesScreenState extends State<NotesScreen> {
             itemCount: notes.length,
             itemBuilder: (context, index) {
               final note = notes[index];
-              return _buildNoteItem(note); // Builds each note item widget.
+              return _buildNoteItem(note);
             },
           );
         },
@@ -250,23 +264,21 @@ class _NotesScreenState extends State<NotesScreen> {
     );
   }
 
-  // Builds the visual representation of a single note item.
   Widget _buildNoteItem(Note note) {
-    // Generates a snippet of the content, ensuring it doesn't exceed a certain length.
     String contentSnippet = note.content.length > 50
         ? '${note.content.substring(0, min(note.content.length, 50))}...'
         : note.content;
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
-      elevation: 1.5, // Slightly reduced elevation
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)), // Softer corners
+      elevation: 1.5,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         title: Text(
-          note.title.isEmpty ? "Untitled Note" : note.title, // Display "Untitled Note" if title is empty.
+          note.title.isEmpty ? "Untitled Note" : note.title,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600, // Slightly bolder title
+            fontWeight: FontWeight.w600,
             color: Theme.of(context).colorScheme.onSurface,
           ),
           maxLines: 1,
@@ -280,14 +292,14 @@ class _NotesScreenState extends State<NotesScreen> {
               Text(
                 contentSnippet,
                 style: TextStyle(color: Colors.grey.shade600),
-                maxLines: 2, // Allow up to 2 lines for snippet
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
             ],
             const SizedBox(height: 8),
             Text(
               'Created: ${DateFormat.yMMMd().add_jm().format(note.createdAt.toDate())}',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade500), // Lighter date color
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade500),
             ),
           ],
         ),
@@ -311,7 +323,6 @@ class _NotesScreenState extends State<NotesScreen> {
           ],
         ),
         onTap: () {
-          // Navigate to detail screen for viewing the full note.
           Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => NoteDetailScreen(note: note)),
@@ -321,7 +332,6 @@ class _NotesScreenState extends State<NotesScreen> {
     );
   }
 
-  // Builds a widget to display when the notes list is empty.
   Widget _buildEmptyState() {
     return Center(
       child: Column(

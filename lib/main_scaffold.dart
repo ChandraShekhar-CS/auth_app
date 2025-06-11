@@ -14,47 +14,61 @@ class MainScaffold extends StatefulWidget {
 }
 
 class _MainScaffoldState extends State<MainScaffold> {
-  int _selectedIndex = 0; // Current selected index for the bottom navigation bar.
+  int _selectedIndex = 0;
+  late PageController _pageController;
 
-  // List of Widgets representing the different screens accessible via BottomNavigationBar.
-  // Order must correspond to the BottomNavigationBarItem order.
-  static const List<Widget> _pages = <Widget>[
-    HomeScreen(),
-    TodoListScreen(),
-    NotesScreen(),
-    ProfileScreen(),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(initialPage: _selectedIndex);
+  }
 
-  // Callback function when a BottomNavigationBarItem is tapped.
-  // Updates the selected index to change the displayed page.
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  // This function is called when a navigation bar item is tapped.
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
     });
+    _pageController.jumpToPage(index);
   }
 
-  // List of titles for the AppBar, corresponding to each page in [_pages].
-  // Order must correspond to the BottomNavigationBarItem order.
+  // The list of titles for the AppBar.
   static const List<String> _titles = <String>[
-    'Dashboard', // Title for HomeScreen
-    'My To-Do List', // Title for TodoListScreen
-    'My Notes', // Title for NotesScreen
-    'Profile & Settings', // Title for ProfileScreen
+    'Dashboard',
+    'My To-Do List',
+    'My Notes',
+    'Profile & Settings',
   ];
 
   @override
   Widget build(BuildContext context) {
+    // Build pages on demand to avoid context issues
+    final List<Widget> pages = [
+      HomeScreen(),
+      TodoListScreen(),
+      NotesScreen(),
+      ProfileScreen(),
+    ];
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(_titles[_selectedIndex]), // AppBar title updates based on the selected page.
-        backgroundColor: Theme.of(context).colorScheme.primaryContainer, // Consistent AppBar color
+        title: Text(_titles[_selectedIndex]),
+        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
       ),
-      body: IndexedStack( // Using IndexedStack to preserve state of pages when switching
-        index: _selectedIndex,
-        children: _pages,
+      body: PageView(
+        controller: _pageController,
+        physics: const NeverScrollableScrollPhysics(),
+        children: pages,
       ),
       bottomNavigationBar: BottomNavigationBar(
-        // type: BottomNavigationBarType.fixed, // Ensures all labels are visible
+        // Ensure the type is fixed to prevent the bottom bar from changing behavior
+        // when more or fewer items are selected. This can also help with stability.
+        type: BottomNavigationBarType.fixed,
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(
             icon: Icon(Icons.dashboard_rounded),
@@ -73,11 +87,11 @@ class _MainScaffoldState extends State<MainScaffold> {
             label: 'Profile',
           ),
         ],
-        currentIndex: _selectedIndex, // Highlights the current active item.
-        selectedItemColor: Theme.of(context).colorScheme.primary, // Color for the selected item.
-        unselectedItemColor: Colors.grey.shade600, // Color for unselected items.
-        showUnselectedLabels: true, // Ensures labels for unselected items are also visible.
-        onTap: _onItemTapped, // Callback for when an item is tapped.
+        currentIndex: _selectedIndex,
+        selectedItemColor: Theme.of(context).colorScheme.primary,
+        unselectedItemColor: Colors.grey.shade600,
+        showUnselectedLabels: true,
+        onTap: _onItemTapped,
       ),
     );
   }

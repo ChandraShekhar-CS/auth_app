@@ -20,7 +20,8 @@ class _AuthScreenState extends State<AuthScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   // Controller for the forgot password email dialog.
-  final TextEditingController _forgotPasswordEmailController = TextEditingController();
+  final TextEditingController _forgotPasswordEmailController =
+      TextEditingController();
 
   // Handles the primary authentication logic (sign-in or sign-up).
   void _submitForm() async {
@@ -58,20 +59,23 @@ class _AuthScreenState extends State<AuthScreen> {
       // Map common error codes to more user-friendly messages.
       switch (error.code) {
         case 'user-not-found':
-          errorMessage = 'No user found with that email. Please check your email or sign up.';
+          errorMessage =
+              'No user found with that email. Please check your email or sign up.';
           break;
         case 'wrong-password':
           errorMessage = 'Incorrect password. Please try again.';
           break;
         case 'email-already-in-use':
-          errorMessage = 'An account already exists with that email. Please sign in or use a different email.';
+          errorMessage =
+              'An account already exists with that email. Please sign in or use a different email.';
           break;
         case 'invalid-email':
-           errorMessage = 'The email address is badly formatted.';
-           break;
+          errorMessage = 'The email address is badly formatted.';
+          break;
         case 'weak-password':
-           errorMessage = 'The password is too weak. Please choose a stronger password.';
-           break;
+          errorMessage =
+              'The password is too weak. Please choose a stronger password.';
+          break;
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -83,14 +87,15 @@ class _AuthScreenState extends State<AuthScreen> {
       }
     } catch (e) {
       // Catch any other unexpected errors.
-       if (mounted) {
-         ScaffoldMessenger.of(context).showSnackBar(
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('An unexpected error occurred. Please try again later.'),
+            content:
+                const Text('An unexpected error occurred. Please try again later.'),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
-       }
+      }
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -102,7 +107,8 @@ class _AuthScreenState extends State<AuthScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
-    _forgotPasswordEmailController.dispose(); // Dispose the forgot password controller
+    _forgotPasswordEmailController
+        .dispose(); // Dispose the forgot password controller
     super.dispose();
   }
 
@@ -118,24 +124,51 @@ class _AuthScreenState extends State<AuthScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // App Title
-                Text(
-                  _isLogin ? 'Welcome Back!' : 'Create Account',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.deepPurple,
-                  ),
+                // =================================================================
+                // START: LOGO AND COMPANY NAME SECTION
+                // =================================================================
+
+                // TODO: Replace this Icon widget with your actual logo.
+                // For example, if your logo is in 'assets/logo.png', use:
+                 
+                
+                  Image.asset('assets/logo.png', height: 80),
+                
+                const SizedBox(height: 16),
+
+                // Main App Title
+                const Text(
+                  'NetProphetsGlobal',
                   textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 8),
+
+                // Company Name
+                const Text(
+                  'Technology For Change',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey,
+                  ),
+                ),
+                const SizedBox(height: 48),
+
+                // =================================================================
+                // END: LOGO AND COMPANY NAME SECTION
+                // =================================================================
+
+                // Section title for Login/Signup form
                 Text(
-                  _isLogin ? 'Sign in to continue' : 'Sign up to get started',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleMedium?.copyWith(color: Colors.grey[600]),
+                  _isLogin ? 'Sign In to Your Account' : 'Create a New Account',
+                  style: Theme.of(context).textTheme.titleLarge,
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 40),
+                const SizedBox(height: 24),
 
                 // Email Input Field
                 TextFormField(
@@ -210,13 +243,15 @@ class _AuthScreenState extends State<AuthScreen> {
     _forgotPasswordEmailController.clear(); // Clear any previous input.
     showDialog(
       context: context,
-      builder: (dialogContext) { // Use dialogContext to avoid confusion with screen context
+      builder: (dialogContext) {
+        // Use dialogContext to avoid confusion with screen context
         return AlertDialog(
           title: const Text('Reset Password'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text("Enter your email address and we'll send you a link to reset your password."),
+              const Text(
+                  "Enter your email address and we'll send you a link to reset your password."),
               const SizedBox(height: 20), // Increased spacing
               TextField(
                 controller: _forgotPasswordEmailController,
@@ -234,7 +269,8 @@ class _AuthScreenState extends State<AuthScreen> {
           actions: [
             TextButton(
               child: const Text('Cancel'),
-              onPressed: () => Navigator.of(dialogContext).pop(), // Use dialogContext
+              onPressed: () =>
+                  Navigator.of(dialogContext).pop(), // Use dialogContext
             ),
             ElevatedButton(
               child: const Text('Send Reset Email'),
@@ -245,30 +281,35 @@ class _AuthScreenState extends State<AuthScreen> {
                   // For simplicity, using screen's ScaffoldMessenger.
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: const Text('Please enter a valid email address.'),
+                      content:
+                          const Text('Please enter a valid email address.'),
                       backgroundColor: Theme.of(context).colorScheme.error,
                     ),
                   );
                   return; // Keep dialog open for correction.
                 }
 
-                Navigator.of(dialogContext).pop(); // Close dialog before async operation.
+                Navigator.of(dialogContext)
+                    .pop(); // Close dialog before async operation.
 
                 // Show loading indicator on the main screen.
                 if (mounted) setState(() => _isLoading = true);
 
                 try {
-                  await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+                  await FirebaseAuth.instance
+                      .sendPasswordResetEmail(email: email);
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Password reset email sent to $email. Please check your inbox (and spam folder).'),
+                        content: Text(
+                            'Password reset email sent to $email. Please check your inbox (and spam folder).'),
                         backgroundColor: Colors.green, // Success color
                       ),
                     );
                   }
                 } on FirebaseAuthException catch (e) {
-                  String errorMessage = 'Failed to send reset email. Please try again.';
+                  String errorMessage =
+                      'Failed to send reset email. Please try again.';
                   if (e.code == 'user-not-found') {
                     errorMessage = 'No user found with this email address.';
                   } else if (e.code == 'invalid-email') {
@@ -285,14 +326,15 @@ class _AuthScreenState extends State<AuthScreen> {
                   }
                 } catch (e) {
                   // Catch any other unexpected errors.
-                   if (mounted) {
-                     ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: const Text('An unexpected error occurred. Please try again.'),
-                          backgroundColor: Theme.of(context).colorScheme.error,
-                        ),
-                      );
-                   }
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text(
+                            'An unexpected error occurred. Please try again.'),
+                        backgroundColor: Theme.of(context).colorScheme.error,
+                      ),
+                    );
+                  }
                 } finally {
                   if (mounted) {
                     setState(() => _isLoading = false); // Hide loading indicator.
